@@ -31,8 +31,8 @@ void *myThread(void *a) {
     if (fatia == NULL) {
         fprintf(stderr, "\nErro: Nao foi possivel alocar memoria para a fatia.\n\n");
     }
-
-    double value;
+	
+	double value;
     for(int iter = 0; iter < args->iter; iter++) {
         for(int i = args->start; i < args->end + 1; i++) {
             for(int j = 1; j < args->colunas-1; j++) {
@@ -54,12 +54,11 @@ void *myThread(void *a) {
             receberMensagem(args->id+1, args->id, dm2dGetLine(fatia, args->end-args->start+1), args->colunas*sizeof(double));
         }
     }
-
-    for(int l = 0; l < args->end-args->start; l++) {
-        dm2dSetLine(args->m, args->start + l, dm2dGetLine(fatia, l+1));
-    }
-    return 0;
-}
+    
+    for(int l = 0; l < args->end-args->start; l++){
+		dm2dSetLine(args->m, args->start + l, dm2dGetLine(fatia, l+1));
+	}
+}}}
 
 /*--------------------------------------------------------------------
 | Function: simul
@@ -68,6 +67,7 @@ void *myThread(void *a) {
 DoubleMatrix2D *simul(DoubleMatrix2D *m, int linhas, int colunas, int numIteracoes, int numTrabs, int numMsgs) {
 
     int i, t;
+    double value;
     args_fatia_t *slave_args;
     pthread_t *slaves;
 
@@ -86,13 +86,13 @@ DoubleMatrix2D *simul(DoubleMatrix2D *m, int linhas, int colunas, int numIteraco
         slave_args[t].start = k*t+1;
         slave_args[t].end = k*(t+1);
         slave_args[t].colunas = colunas;
-        slave_args[t].m = m;
+        slave_args[t].matrix = m;
         pthread_create(&slaves[t], NULL, myThread, &slave_args[t]);
     }
-
+    
     for (i=0; i<numTrabs; i++) {
-        pthread_join(slaves[i], NULL);
-    }
+    pthread_join(slaves[i], NULL);
+  }
 
     return m;
 }
@@ -150,7 +150,7 @@ int main (int argc, char** argv) {
     int trab = parse_integer_or_exit(argv[7], "trab");
     int csz = parse_integer_or_exit(argv[8], "csz");
 
-    DoubleMatrix2D *matrix, *result;
+    DoubleMatrix2D *matrix, *matrix_aux, *result;
 
     fprintf(stderr, "\nArgumentos:\n N=%d tEsq=%.1f tSup=%.1f tDir=%.1f tInf=%.1f iteracoes=%d trab=%d csz=%d\n",
             N, tEsq, tSup, tDir, tInf, iteracoes, trab, csz);
