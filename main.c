@@ -27,7 +27,7 @@ void *myThread(void *a) {
 
     args_fatia_t *args   = (args_fatia_t*)a;
     DoubleMatrix2D *fatia = dm2dNew(args->end - args->start + 2, args->colunas);
-
+	int i;
     if (fatia == NULL) {
         fprintf(stderr, "\nErro: Nao foi possivel alocar memoria para a fatia.\n\n");
     }
