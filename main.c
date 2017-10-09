@@ -20,44 +20,59 @@ typedef struct {
     int end;
     int linhas;
     int colunas;
-    DoubleMatrix2D *m;
 } args_fatia_t;
 
 void *myThread(void *a) {
 
     args_fatia_t *args   = (args_fatia_t*)a;
+    int id = args->id;
+    int linhas = args->linhas;
+    int colunas = args->colunas;
+    int start = args->start;
+    int end = args->end;
     DoubleMatrix2D *fatia = dm2dNew(args->end - args->start + 2, args->colunas);
-	int i;
+    DoubleMatrix2D *fatia_aux = dm2dNew(args->end - args->start + 2, args->colunas);
+    DoubleMatrix2D *tmp;
+    
     if (fatia == NULL) {
         fprintf(stderr, "\nErro: Nao foi possivel alocar memoria para a fatia.\n\n");
     }
+    
+    for(int k = 0; k < end-start+2; k++){
+		receberMensagem(0, id, dm2dGetLine(fatia, k), colunas*sizeof(double));
+	}
 
     double value;
     for(int iter = 0; iter < args->iter; iter++) {
-        for(int i = args->start; i < args->end + 1; i++) {
-            for(int j = 1; j < args->colunas-1; j++) {
-                value = ( dm2dGetEntry(args->m, i-1, j) + dm2dGetEntry(args->m, i+1, j) +
-                          dm2dGetEntry(args->m, i, j-1) + dm2dGetEntry(args->m, i, j+1) ) / 4.0;
-                dm2dSetEntry(fatia, i-args->start, j, value);
+        for(int i = start; i < end + 1; i++) {
+            for(int j = 1; j < colunas-1; j++) {
+                value = ( dm2dGetEntry(fatia, i-1, j) + dm2dGetEntry(fatia, i+1, j) +
+                          dm2dGetEntry(fatia, i, j-1) + dm2dGetEntry(fatia, i, j+1) ) / 4.0;
+                dm2dSetEntry(fatia_aux, i-start, j, value);
             }
         }
-        if(args->id > 0) {
-            enviarMensagem(args->id, args->id-1, dm2dGetLine(fatia, 1), args->colunas*sizeof(double));
+        if(id > 1) {
+            enviarMensagem(id, id-1, dm2dGetLine(fatia_aux, 1), colunas*sizeof(double));
         }
-        if(args->id < args->linhas-1) {
-            enviarMensagem(args->id, args->id+1, dm2dGetLine(fatia, args->end-args->start), args->colunas*sizeof(double));
+        if(id < linhas) {
+            enviarMensagem(id, id+1, dm2dGetLine(fatia_aux, end-start), colunas*sizeof(double));
         }
-        if(args->id > 0) {
-            receberMensagem(args->id-1, args->id, dm2dGetLine(fatia, 0), args->colunas*sizeof(double));
+        if(id > 1) {
+            receberMensagem(id-1, id, dm2dGetLine(fatia_aux, 0), colunas*sizeof(double));
         }
-        if(args->id < args->linhas-1) {
-            receberMensagem(args->id+1, args->id, dm2dGetLine(fatia, args->end-args->start+1), args->colunas*sizeof(double));
+        if(id < linhas) {
+            receberMensagem(id+1, id, dm2dGetLine(fatia_aux, end-start+1), colunas*sizeof(double));
         }
+        
+        tmp = fatia_aux;
+		fatia_aux = fatia;
+		fatia = tmp;
     }
-
-    for(int l = 0; l < args->end-args->start; l++) {
-        dm2dSetLine(args->m, args->start + l, dm2dGetLine(fatia, l+1));
-    }
+    
+    for(int l = 0; l < end-start; l++){
+		enviarMensagem(id, 0, dm2dGetLine(fatia, l+1), colunas*sizeof(double));
+	}
+    
     return 0;
 }
 
@@ -65,7 +80,7 @@ void *myThread(void *a) {
 | Function: simul
 ---------------------------------------------------------------------*/
 
-DoubleMatrix2D *simul(DoubleMatrix2D *m, int linhas, int colunas, int numIteracoes, int numTrabs, int numMsgs) {
+DoubleMatrix2D *simul(DoubleMatrix2D *matrix, int linhas, int colunas, int numIteracoes, int numTrabs, int numMsgs) {
 
     int i, t;
     args_fatia_t *slave_args;
@@ -81,20 +96,29 @@ DoubleMatrix2D *simul(DoubleMatrix2D *m, int linhas, int colunas, int numIteraco
     slaves = (pthread_t*)malloc(numTrabs*sizeof(pthread_t));
 
     for (t=0; t<numTrabs; t++) {
-        slave_args[t].id = t;
+        slave_args[t].id = t+1;
         slave_args[t].iter = numIteracoes;
         slave_args[t].start = k*t+1;
         slave_args[t].end = k*(t+1);
         slave_args[t].colunas = colunas;
-        slave_args[t].m = m;
         pthread_create(&slaves[t], NULL, myThread, &slave_args[t]);
+        for(int j = 0; j < k+2; j++){
+			enviarMensagem(0, t+1, dm2dGetLine(matrix, k*t+j), colunas*sizeof(double));
+		}
+			
     }
+    
+    for(int l = 0; l < numTrabs; l++){
+		for(int m = 0; m < k; m++){
+			receberMensagem(l+1, 0, dm2dGetLine(matrix, k*l+m), colunas*sizeof(double));
+		}
+	}
 
     for (i=0; i<numTrabs; i++) {
         pthread_join(slaves[i], NULL);
     }
 
-    return m;
+    return matrix;
 }
 
 /*--------------------------------------------------------------------
@@ -160,7 +184,7 @@ int main (int argc, char** argv) {
         return 1;
     }
 
-    if(inicializarMPlib(csz, trab)) {
+    if(inicializarMPlib(csz, trab+1)) {
         fprintf(stderr, "\nErro ao inicializar MPlib\n");
         return -1;
     }
