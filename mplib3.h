@@ -30,11 +30,11 @@
 |
 |
 | Function: enviarMensagem
-| Description: Envia uma mensagem, indicada pelo ponteiro msg, da tarefaOrig 
+| Description: Envia uma mensagem, indicada pelo ponteiro msg, da tarefaOrig
 |              para a tarefaDest, com um dado tamanho. Se o canal não estiver
-|              cheio, os dados são copiados para um tampão temporário (ou o 
-|              emissor fica bloqueado, caso a capacidade do canal seja 0). 
-|              Se o canal estiver cheio, o emissor é bloqueado até a tarefa 
+|              cheio, os dados são copiados para um tampão temporário (ou o
+|              emissor fica bloqueado, caso a capacidade do canal seja 0).
+|              Se o canal estiver cheio, o emissor é bloqueado até a tarefa
 |              destino ler mensagens do canal.
 |              Em caso de sucesso devolve o tamanho da mensagem.
 |              Em caso de erro devolve -1.

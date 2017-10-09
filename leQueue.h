@@ -77,7 +77,7 @@
 |   Global Definitions
 +----------------------------------------------------------------------*/
 
-typedef	struct	QueElem  
+typedef	struct	QueElem
 {
     struct QueElem *prev;
     struct QueElem *next;
@@ -86,11 +86,11 @@ typedef	struct	QueElem
 
 #define  SzQueElem  sizeof (struct QueElem)
 
-typedef struct QueHead	
+typedef struct QueHead
 {
-  QueElem elem;
-  int     nel;
-  int     maxelem;
+    QueElem elem;
+    int     nel;
+    int     maxelem;
 } QueHead;
 
 #define  SzQueHead  sizeof (struct QueHead)
