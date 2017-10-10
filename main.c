@@ -40,6 +40,7 @@ void *myThread(void *a) {
 
     for(int k = 0; k < end - start + 2 + 1; k++) {
         receberMensagem(0, id, dm2dGetLine(fatia, k), colunas*sizeof(double));
+        receberMensagem(0, id, dm2dGetLine(fatia_aux, k), colunas*sizeof(double));
     }
     
     printf("Slice %d:\n", id);
@@ -111,6 +112,7 @@ DoubleMatrix2D *simul(DoubleMatrix2D *matrix, int linhas, int colunas, int numIt
         pthread_create(&slaves[t], NULL, myThread, &slave_args[t]);
         for(int j = 0; j < k+2; j++) {
             enviarMensagem(0, t+1, dm2dGetLine(matrix, k*t+j), colunas*sizeof(double));
+            enviarMensagem(0, t+1, dm2dGetLine(matrix, k*t+j), colunas*sizeof(double));
         }
     }
 
@@ -123,6 +125,9 @@ DoubleMatrix2D *simul(DoubleMatrix2D *matrix, int linhas, int colunas, int numIt
     for (int i=0; i<numTrabs; i++) {
         pthread_join(slaves[i], NULL);
     }
+
+    free(slave_args);
+    free(slaves);
 
     return matrix;
 }
