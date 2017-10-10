@@ -77,6 +77,9 @@ void *myThread(void *a) {
         enviarMensagem(id, 0, dm2dGetLine(fatia, l+1), colunas*sizeof(double));
     }
 
+    dm2dFree(fatia);
+    dm2dFree(fatia_aux);
+
     return 0;
 }
 
