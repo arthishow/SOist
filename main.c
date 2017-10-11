@@ -42,9 +42,6 @@ void *myThread(void *a) {
         receberMensagem(0, id, dm2dGetLine(fatia, k), colunas*sizeof(double));
         receberMensagem(0, id, dm2dGetLine(fatia_aux, k), colunas*sizeof(double));
     }
-    
-    printf("Slice %d:\n", id);
-    dm2dPrint(fatia);
 
     double value;
     for(int iter = 0; iter < args->iter; iter++) {
@@ -57,21 +54,16 @@ void *myThread(void *a) {
         }
         if(start > 1) {
             enviarMensagem(id, id-1, dm2dGetLine(fatia_aux, 1), colunas*sizeof(double));
-        }
-        if(end < linhas-2) {
-            enviarMensagem(id, id+1, dm2dGetLine(fatia_aux, end-start+1), colunas*sizeof(double));
-        }
-        if(start > 1) {
             receberMensagem(id-1, id, dm2dGetLine(fatia_aux, 0), colunas*sizeof(double));
         }
         if(end < linhas-2) {
             receberMensagem(id+1, id, dm2dGetLine(fatia_aux, end-start+2), colunas*sizeof(double));
+            enviarMensagem(id, id+1, dm2dGetLine(fatia_aux, end-start+1), colunas*sizeof(double));
         }
 
         tmp = fatia_aux;
         fatia_aux = fatia;
         fatia = tmp;
-        dm2dPrint(fatia);
     }
 
     for(int l = 0; l < end-start+1; l++) {
