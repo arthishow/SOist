@@ -37,10 +37,12 @@ void *myThread(void *a) {
     if (fatia == NULL || fatia_aux==NULL) {
         fprintf(stderr, "\nErro: Nao foi possivel alocar memoria para a fatia.\n\n");
     }
-
+	
+	double buffer[colunas*sizeof(double)];
     for(int k = 0; k < end - start + 2 + 1; k++) {
-        receberMensagem(0, id, dm2dGetLine(fatia, k), colunas*sizeof(double));
-        receberMensagem(0, id, dm2dGetLine(fatia_aux, k), colunas*sizeof(double));
+        receberMensagem(0, id, buffer, colunas*sizeof(double));
+        dm2dSetLine(fatia, k, buffer);
+        dm2dSetLine(fatia_aux, k, buffer);
     }
 
     double value;
@@ -52,6 +54,7 @@ void *myThread(void *a) {
                 dm2dSetEntry(fatia_aux, i, j, value);
             }
         }
+        
         if(start > 1) {
             enviarMensagem(id, id-1, dm2dGetLine(fatia_aux, 1), colunas*sizeof(double));
             receberMensagem(id-1, id, dm2dGetLine(fatia_aux, 0), colunas*sizeof(double));
@@ -103,7 +106,6 @@ DoubleMatrix2D *simul(DoubleMatrix2D *matrix, int linhas, int colunas, int numIt
         slave_args[t].colunas = colunas;
         pthread_create(&slaves[t], NULL, myThread, &slave_args[t]);
         for(int j = 0; j < k+2; j++) {
-            enviarMensagem(0, t+1, dm2dGetLine(matrix, k*t+j), colunas*sizeof(double));
             enviarMensagem(0, t+1, dm2dGetLine(matrix, k*t+j), colunas*sizeof(double));
         }
     }
@@ -210,6 +212,7 @@ int main (int argc, char** argv) {
     if (result == NULL) {
         printf("\nErro na simulacao.\n\n");
         libertarMPlib();
+        dm2dFree(matrix);
         return -1;
     }
 
