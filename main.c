@@ -34,11 +34,11 @@ void *myThread(void *a) {
     DoubleMatrix2D *fatia_aux = dm2dNew(end - start + 2 + 1, colunas);
     DoubleMatrix2D *tmp;
 
-    if (fatia == NULL || fatia_aux==NULL) {
+    if (fatia == NULL || fatia_aux == NULL) {
         fprintf(stderr, "\nErro: Nao foi possivel alocar memoria para a fatia.\n\n");
     }
-	
-	double buffer[colunas*sizeof(double)];
+
+    double buffer[colunas*sizeof(double)];
     for(int k = 0; k < end - start + 2 + 1; k++) {
         receberMensagem(0, id, buffer, colunas*sizeof(double));
         dm2dSetLine(fatia, k, buffer);
@@ -54,7 +54,7 @@ void *myThread(void *a) {
                 dm2dSetEntry(fatia_aux, i, j, value);
             }
         }
-        
+
         if(start > 1) {
             enviarMensagem(id, id-1, dm2dGetLine(fatia_aux, 1), colunas*sizeof(double));
             receberMensagem(id-1, id, dm2dGetLine(fatia_aux, 0), colunas*sizeof(double));
@@ -117,7 +117,12 @@ DoubleMatrix2D *simul(DoubleMatrix2D *matrix, int linhas, int colunas, int numIt
     }
 
     for (int i=0; i<numTrabs; i++) {
-        pthread_join(slaves[i], NULL);
+        if (pthread_join(slaves[i], NULL)) {
+            fprintf(stderr, "\nErro ao esperar por um escravo.\n");
+            free(slave_args);
+            free(slaves);
+            return NULL;
+        }
     }
 
     free(slave_args);
