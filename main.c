@@ -1,6 +1,7 @@
 /*
-// Projeto SO - exercicio 1, version 03
-// Sistemas Operativos, DEI/IST/ULisboa 2017-18
+    Grupo 11
+    Arthur Vernet 88895
+    Tomas Vieira 86523
 */
 
 #include <stdio.h>
@@ -79,9 +80,6 @@ void *myThread(void *a) {
     return 0;
 }
 
-/*--------------------------------------------------------------------
-| Function: simul
----------------------------------------------------------------------*/
 
 DoubleMatrix2D *simul(DoubleMatrix2D *matrix, int linhas, int colunas, int numIteracoes, int numTrabs, int numMsgs) {
 
