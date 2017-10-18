@@ -43,7 +43,7 @@ typedef struct mutex_t {
 int                channel_capacity;
 int                number_of_tasks;
 Channel_t          **channel_array;
-Mutex_t            *mutex_array; 
+Mutex_t            *mutex_array;
 
 
 /*--------------------------------------------------------------------
@@ -99,19 +99,19 @@ int inicializarMPlib(int capacidade_de_cada_canal, int ntasks) {
     for(int k=0; k<ntasks; k++) {
 
         if(pthread_mutex_init(&mutex_array[k].mutex, NULL) != 0) {
-        fprintf(stderr, "\nErro ao inicializar mutex\n");
-        return -1;
-    }
+            fprintf(stderr, "\nErro ao inicializar mutex\n");
+            return -1;
+        }
 
-    if(pthread_cond_init(&mutex_array[k].wait_for_free_space, NULL) != 0) {
-        fprintf(stderr, "\nErro ao inicializar variável de condição\n");
-        return -1;
-    }
+        if(pthread_cond_init(&mutex_array[k].wait_for_free_space, NULL) != 0) {
+            fprintf(stderr, "\nErro ao inicializar variável de condição\n");
+            return -1;
+        }
 
-    if(pthread_cond_init(&mutex_array[k].wait_for_messages, NULL) != 0) {
-        fprintf(stderr, "\nErro ao inicializar variável de condição\n");
-        return -1;
-    }
+        if(pthread_cond_init(&mutex_array[k].wait_for_messages, NULL) != 0) {
+            fprintf(stderr, "\nErro ao inicializar variável de condição\n");
+            return -1;
+        }
     }
 
 
