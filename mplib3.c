@@ -201,16 +201,7 @@ int receberMensagem(int tarefaOrig, int tarefaDest, void *buffer, int tamanho) {
     channel = (Channel_t*) channel_array[tarefaDest*number_of_tasks+tarefaOrig];
     mess    = (Message_t*) leQueRemFirst (channel->message_list);
 
-    
-    /* (check the way i placed the tarefaOrig and tarefaDest, i think its good tell me if you agree)...
-    its getting stuck in this while when its not supposed to.
-    mess is NULL, but it shouldnt be (cause the main thread already sent the messages)... 
-    i believe the problem is related with the chanels cause its not saving the messages 
-    that were sent or its doing it in wrong way */
-    
-
     while (!mess) {
-        printf("here\n");
         if(pthread_cond_wait(&mutex_array[tarefaDest].wait_for_messages, &mutex_array[tarefaDest].mutex) != 0) {
             fprintf(stderr, "\nErro ao esperar pela variável de condição\n");
             return -1;
@@ -288,7 +279,7 @@ int enviarMensagem(int tarefaOrig, int tarefaDest, void *msg, int tamanho) {
         return -1;
     }
 
-    channel = (Channel_t*) channel_array[tarefaOrig*number_of_tasks+tarefaOrig];
+    channel = (Channel_t*) channel_array[tarefaDest*number_of_tasks+tarefaOrig];
 
     /* if channels are buffered, wait until there is buffer available */
     if (channel_capacity >0) {
