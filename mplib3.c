@@ -25,14 +25,12 @@ typedef struct message_t {
 
 typedef struct channel_t {
     QueHead   *message_list;
-
 } Channel_t;
 
 typedef struct mutex_t {
     pthread_mutex_t    mutex;
     pthread_cond_t     wait_for_free_space;
     pthread_cond_t     wait_for_messages;
-
 } Mutex_t;
 
 
@@ -96,44 +94,25 @@ int inicializarMPlib(int capacidade_de_cada_canal, int ntasks) {
         return -1;
     }
 
-    for(int k=0; k<ntasks; k++) {
-
-        if(pthread_mutex_init(&mutex_array[k].mutex, NULL) != 0) {
-            fprintf(stderr, "\nErro ao inicializar mutex\n");
-            return -1;
-        }
-
-        if(pthread_cond_init(&mutex_array[k].wait_for_free_space, NULL) != 0) {
-            fprintf(stderr, "\nErro ao inicializar variável de condição\n");
-            return -1;
-        }
-
-        if(pthread_cond_init(&mutex_array[k].wait_for_messages, NULL) != 0) {
-            fprintf(stderr, "\nErro ao inicializar variável de condição\n");
-            return -1;
-        }
-    }
-
-
     for (i=0; i<ntasks; i++) {
         for (j=0; j<ntasks; j++) {
             channel = createChannel();
             if (channel == NULL)
                 return -1;
+            int index = i*ntasks+j;
+            channel_array[index] = channel;
 
-            channel_array[i*ntasks+j] = channel;
-
-            if(pthread_mutex_init(&mutex_array[i*ntasks+j].mutex, NULL) != 0) {
+            if(pthread_mutex_init(&mutex_array[index].mutex, NULL) != 0) {
                 fprintf(stderr, "\nErro ao inicializar mutex\n");
                 return -1;
             }
 
-            if(pthread_cond_init(&mutex_array[i*ntasks+j].wait_for_free_space, NULL) != 0) {
+            if(pthread_cond_init(&mutex_array[index].wait_for_free_space, NULL) != 0) {
                 fprintf(stderr, "\nErro ao inicializar variável de condição\n");
                 return -1;
             }
 
-            if(pthread_cond_init(&mutex_array[i*ntasks+j].wait_for_messages, NULL) != 0) {
+            if(pthread_cond_init(&mutex_array[index].wait_for_messages, NULL) != 0) {
                 fprintf(stderr, "\nErro ao inicializar variável de condição\n");
                 return -1;
             }
@@ -152,27 +131,10 @@ int inicializarMPlib(int capacidade_de_cada_canal, int ntasks) {
 void libertarMPlib() {
     int i,j;
 
-    for(int k=0; k<number_of_tasks; k++) {
-
-        if(pthread_mutex_destroy(&mutex_array[k].mutex) != 0) {
-            fprintf(stderr, "\nErro ao destruir mutex\n");
-            exit(EXIT_FAILURE);
-        }
-
-        if(pthread_cond_destroy(&mutex_array[k].wait_for_free_space) != 0) {
-            fprintf(stderr, "\nErro ao destruir variável de condição\n");
-            exit(EXIT_FAILURE);
-        }
-
-        if(pthread_cond_destroy(&mutex_array[k].wait_for_messages) != 0) {
-            fprintf(stderr, "\nErro ao destruir variável de condição\n");
-            exit(EXIT_FAILURE);
-        }
-    }
-
     for (i=0; i<number_of_tasks; i++) {
         for (j=0; j<number_of_tasks; j++) {
-            Channel_t   *channel = channel_array[i*number_of_tasks+j];
+            int index = i*number_of_tasks+j;
+            Channel_t   *channel = channel_array[index];
             Message_t   *mess    = (Message_t*) leQueRemFirst(channel->message_list);
 
             while (mess) {
@@ -185,6 +147,20 @@ void libertarMPlib() {
             /* delete message list header for this channel */
             leQueFreeHead (channel->message_list);
             free (channel);
+            if(pthread_mutex_destroy(&mutex_array[index].mutex) != 0) {
+                fprintf(stderr, "\nErro ao destruir mutex\n");
+                exit(EXIT_FAILURE);
+            }
+
+            if(pthread_cond_destroy(&mutex_array[index].wait_for_free_space) != 0) {
+                fprintf(stderr, "\nErro ao destruir variável de condição\n");
+                exit(EXIT_FAILURE);
+            }
+
+            if(pthread_cond_destroy(&mutex_array[index].wait_for_messages) != 0) {
+            fprintf(stderr, "\nErro ao destruir variável de condição\n");
+                exit(EXIT_FAILURE);
+            }
         }
     }
     free (channel_array);
