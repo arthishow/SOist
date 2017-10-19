@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+
+#include <time.h>
+
 #include "matrix2d.h"
 #include "mplib3.h"
 
@@ -268,7 +271,7 @@ int main (int argc, char** argv) {
         }
     }
 
-
+    clock_t start = clock();
     /* Enviar Fatias a cada Trabalhadora */
     tam_msg = (N+2) * sizeof(double);
     for (i = 0; i < trab; i++) {
@@ -291,6 +294,10 @@ int main (int argc, char** argv) {
             }
         }
     }
+
+    clock_t end = clock();
+    double time = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("\n%f\n", time);
 
     /* Esperar que as Trabalhadoras Terminem */
     for (i = 0; i < trab; i++) {

@@ -89,9 +89,9 @@ int inicializarMPlib(int capacidade_de_cada_canal, int ntasks) {
     number_of_tasks  = ntasks;
     channel_capacity = capacidade_de_cada_canal;
     channel_array    = (Channel_t**) malloc (sizeof(Channel_t*)*ntasks*ntasks);
-    mutex_array = (Mutex_t*) malloc (sizeof(Mutex_t)*ntasks);
+    mutex_array = (Mutex_t*) malloc (sizeof(Mutex_t)*ntasks*ntasks);
 
-    if (channel_array == NULL) {
+    if (channel_array == NULL || mutex_array == NULL) {
         fprintf(stderr, "\nErro ao alocar memória para MPlib\n");
         return -1;
     }
@@ -121,7 +121,22 @@ int inicializarMPlib(int capacidade_de_cada_canal, int ntasks) {
             if (channel == NULL)
                 return -1;
 
-            channel_array[i*number_of_tasks+j] = channel;
+            channel_array[i*ntasks+j] = channel;
+
+            if(pthread_mutex_init(&mutex_array[i*ntasks+j].mutex, NULL) != 0) {
+                fprintf(stderr, "\nErro ao inicializar mutex\n");
+                return -1;
+            }
+
+            if(pthread_cond_init(&mutex_array[i*ntasks+j].wait_for_free_space, NULL) != 0) {
+                fprintf(stderr, "\nErro ao inicializar variável de condição\n");
+                return -1;
+            }
+
+            if(pthread_cond_init(&mutex_array[i*ntasks+j].wait_for_messages, NULL) != 0) {
+                fprintf(stderr, "\nErro ao inicializar variável de condição\n");
+                return -1;
+            }
         }
     }
     return 0;
@@ -192,17 +207,18 @@ int receberMensagem(int tarefaOrig, int tarefaDest, void *buffer, int tamanho) {
     Channel_t      *channel;
     Message_t      *mess;
     int            copysize;
+    int index = tarefaDest*number_of_tasks+tarefaOrig;
 
-    if(pthread_mutex_lock(&mutex_array[tarefaDest].mutex) != 0) {
+    if(pthread_mutex_lock(&mutex_array[index].mutex) != 0) {
         fprintf(stderr, "\nErro ao bloquear mutex\n");
         return -1;
     }
 
-    channel = (Channel_t*) channel_array[tarefaDest*number_of_tasks+tarefaOrig];
+    channel = (Channel_t*) channel_array[index];
     mess    = (Message_t*) leQueRemFirst (channel->message_list);
 
     while (!mess) {
-        if(pthread_cond_wait(&mutex_array[tarefaDest].wait_for_messages, &mutex_array[tarefaDest].mutex) != 0) {
+        if(pthread_cond_wait(&mutex_array[index].wait_for_messages, &mutex_array[index].mutex) != 0) {
             fprintf(stderr, "\nErro ao esperar pela variável de condição\n");
             return -1;
         }
@@ -218,12 +234,12 @@ int receberMensagem(int tarefaOrig, int tarefaDest, void *buffer, int tamanho) {
     else
         mess->consumed = 1;
 
-    if(pthread_cond_broadcast(&mutex_array[tarefaOrig].wait_for_free_space) != 0) {
+    if(pthread_cond_broadcast(&mutex_array[index].wait_for_free_space) != 0) {
         fprintf(stderr, "\nErro ao desbloquear variável de condição\n");
         return -1;
     }
 
-    if(pthread_mutex_unlock(&mutex_array[tarefaDest].mutex) != 0) {
+    if(pthread_mutex_unlock(&mutex_array[index].mutex) != 0) {
         fprintf(stderr, "\nErro ao desbloquear mutex\n");
         return -1;
     }
@@ -274,17 +290,19 @@ int enviarMensagem(int tarefaOrig, int tarefaDest, void *msg, int tamanho) {
         mess->consumed = 0;
     }
 
-    if(pthread_mutex_lock(&mutex_array[tarefaOrig].mutex) != 0) {
+    int index = tarefaDest*number_of_tasks+tarefaOrig;
+
+    if(pthread_mutex_lock(&mutex_array[index].mutex) != 0) {
         fprintf(stderr, "\nErro ao bloquear mutex\n");
         return -1;
     }
 
-    channel = (Channel_t*) channel_array[tarefaDest*number_of_tasks+tarefaOrig];
+    channel = (Channel_t*) channel_array[index];
 
     /* if channels are buffered, wait until there is buffer available */
     if (channel_capacity >0) {
         while (leQueSize(channel->message_list) >= channel_capacity) {
-            if(pthread_cond_wait(&mutex_array[tarefaOrig].wait_for_free_space, &mutex_array[tarefaOrig].mutex) != 0) {
+            if(pthread_cond_wait(&mutex_array[index].wait_for_free_space, &mutex_array[index].mutex) != 0) {
                 fprintf(stderr, "\nErro ao esperar pela variável de condição\n");
                 return -1;
             }
@@ -292,12 +310,12 @@ int enviarMensagem(int tarefaOrig, int tarefaDest, void *msg, int tamanho) {
     }
 
     leQueInsLast (channel->message_list, mess);
-    pthread_cond_broadcast(&mutex_array[tarefaDest].wait_for_messages);
+    pthread_cond_broadcast(&mutex_array[index].wait_for_messages);
 
     /* if channels are not buffered, wait for message to be read */
     if (channel_capacity==0) {
         while (mess->consumed==0) {
-            if(pthread_cond_wait(&mutex_array[tarefaOrig].wait_for_free_space, &mutex_array[tarefaOrig].mutex) != 0) {
+            if(pthread_cond_wait(&mutex_array[index].wait_for_free_space, &mutex_array[index].mutex) != 0) {
                 fprintf(stderr, "\nErro ao esperar pela variável de condição\n");
                 return -1;
             }
@@ -306,7 +324,7 @@ int enviarMensagem(int tarefaOrig, int tarefaDest, void *msg, int tamanho) {
         free(mess);
     }
 
-    if(pthread_mutex_unlock(&mutex_array[tarefaOrig].mutex) != 0) {
+    if(pthread_mutex_unlock(&mutex_array[index].mutex) != 0) {
         fprintf(stderr, "\nErro ao desbloquear mutex\n");
         return -1;
     }
