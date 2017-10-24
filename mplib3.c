@@ -1,6 +1,6 @@
 /*
 // Biblioteca de troca de mensagens, versao 3
-// Sistemas Operativos, DEI/IST/ULisboa 2017-18 ,.
+// Sistemas Operativos, DEI/IST/ULisboa 2017-18
 */
 
 #include "mplib3.h"
@@ -159,7 +159,7 @@ void libertarMPlib() {
             }
 
             if(pthread_cond_destroy(&mutex_array[index].wait_for_messages) != 0) {
-            fprintf(stderr, "\nErro ao destruir variável de condição\n");
+                fprintf(stderr, "\nErro ao destruir variável de condição\n");
                 exit(EXIT_FAILURE);
             }
         }
@@ -185,16 +185,16 @@ int receberMensagem(int tarefaOrig, int tarefaDest, void *buffer, int tamanho) {
     Message_t      *mess;
     int            copysize;
     int index = tarefaDest*number_of_tasks+tarefaOrig;
-    
+
     channel = (Channel_t*) channel_array[index];
-    
+
     if(pthread_mutex_lock(&mutex_array[index].mutex) != 0) {
         fprintf(stderr, "\nErro ao bloquear mutex\n");
         return -1;
     }
 
 
-    mess    = (Message_t*) leQueRemFirst (channel->message_list);
+    mess = (Message_t*) leQueRemFirst (channel->message_list);
 
     while (!mess) {
         if(pthread_cond_wait(&mutex_array[index].wait_for_messages, &mutex_array[index].mutex) != 0) {
