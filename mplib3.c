@@ -1,6 +1,6 @@
 /*
 // Biblioteca de troca de mensagens, versao 3
-// Sistemas Operativos, DEI/IST/ULisboa 2017-18
+// Sistemas Operativos, DEI/IST/ULisboa 2017-18 ,.
 */
 
 #include "mplib3.h"
@@ -82,6 +82,7 @@ Channel_t* createChannel () {
 
 int inicializarMPlib(int capacidade_de_cada_canal, int ntasks) {
     int i, j;
+    int index;
     Channel_t* channel;
 
     number_of_tasks  = ntasks;
@@ -99,7 +100,7 @@ int inicializarMPlib(int capacidade_de_cada_canal, int ntasks) {
             channel = createChannel();
             if (channel == NULL)
                 return -1;
-            int index = i*ntasks+j;
+            index = i*ntasks+j;
             channel_array[index] = channel;
 
             if(pthread_mutex_init(&mutex_array[index].mutex, NULL) != 0) {
@@ -184,13 +185,15 @@ int receberMensagem(int tarefaOrig, int tarefaDest, void *buffer, int tamanho) {
     Message_t      *mess;
     int            copysize;
     int index = tarefaDest*number_of_tasks+tarefaOrig;
-
+    
+    channel = (Channel_t*) channel_array[index];
+    
     if(pthread_mutex_lock(&mutex_array[index].mutex) != 0) {
         fprintf(stderr, "\nErro ao bloquear mutex\n");
         return -1;
     }
 
-    channel = (Channel_t*) channel_array[index];
+
     mess    = (Message_t*) leQueRemFirst (channel->message_list);
 
     while (!mess) {
@@ -239,6 +242,7 @@ int receberMensagem(int tarefaOrig, int tarefaDest, void *buffer, int tamanho) {
 int enviarMensagem(int tarefaOrig, int tarefaDest, void *msg, int tamanho) {
     Channel_t      *channel;
     Message_t      *mess;
+    int index;
 
     mess = (Message_t*) malloc (sizeof(Message_t));
 
@@ -266,7 +270,7 @@ int enviarMensagem(int tarefaOrig, int tarefaDest, void *msg, int tamanho) {
         mess->consumed = 0;
     }
 
-    int index = tarefaDest*number_of_tasks+tarefaOrig;
+    index = tarefaDest*number_of_tasks+tarefaOrig;
 
     if(pthread_mutex_lock(&mutex_array[index].mutex) != 0) {
         fprintf(stderr, "\nErro ao bloquear mutex\n");
