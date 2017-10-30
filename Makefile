@@ -4,12 +4,15 @@
 CFLAGS += -g -Wall -pedantic
 CC = gcc
 
-all: heatSim1 heatSim2
+all: heatSim3
 
 heatSim1: main.o matrix2d.o mplib3.o leQueue.o
 	$(CC) -o $@ $^ $(CFLAGS) -lpthread
 	
 heatSim2: main.o matrix2d.o mplib4.o leQueue.o
+	$(CC) -o $@ $^ $(CFLAGS) -lpthread
+	
+heatSim3: main.o matrix2d.o leQueue.o
 	$(CC) -o $@ $^ $(CFLAGS) -lpthread
 
 main.o: main.c matrix2d.h mplib3.h
@@ -28,7 +31,7 @@ leQueue.o: leQueue.c leQueue.h
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 clean:
-	rm -f *.o *.orig heatSim
+	rm -f *.o *.orig heatSim1 heatSim2 heatSim3
 
 zip:
 	zip heatSim.zip main.c matrix2d.c matrix2d.h mplib3.c mplib3.h mp4lib.c mp4lib.h leQueue.c leQueue.h Makefile
