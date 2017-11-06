@@ -12,6 +12,8 @@
 #include "matrix2d.h"
 #include "mplib3.h"
 
+DoubleMatrix2D* matrix, matrix_aux;
+
 /*--------------------------------------------------------------------
 | Type: thread_info
 | Description: Estrutura com Informação para Trabalhadoras
@@ -37,7 +39,6 @@ void *tarefa_trabalhadora(void* args) {
     DoubleMatrix2D *fatias[2];
     int atual, prox;
     int iter;
-    int res, tam_msg;
     int i, j;
 
     /* Criar Matrizes */
@@ -47,16 +48,6 @@ void *tarefa_trabalhadora(void* args) {
     if (fatias[0] == NULL || fatias[1] == NULL) {
         fprintf(stderr, "\nErro ao criar Matrix2d numa trabalhadora.\n");
         exit(-1);
-    }
-
-    /* Receber Fatia da Tarefa Mestre */
-    tam_msg = (tinfo->N+2) * sizeof(double);
-    for (i = 0; i < tinfo->tam_fatia + 2; i++) {
-        res = receberMensagem(0, tinfo->id, dm2dGetLine(fatias[0], i), tam_msg);
-        if(res != tam_msg) {
-            fprintf(stderr, "\nErro ao receber mensagem da tarefa mestre.\n");
-            exit(-1);
-        }
     }
 
     dm2dCopy(fatias[1], fatias[0]);
@@ -76,63 +67,7 @@ void *tarefa_trabalhadora(void* args) {
                 dm2dSetEntry(fatias[prox], i+1, j+1, val);
             }
         }
-
-        /* Enviar e Receber Novos Valores das Linhas Adjacentes. As Tarefas Par Enviam antes de Receberem. */
-        if(tinfo->id % 2 == 0) {
-            if(tinfo->id > 1) {
-                if(enviarMensagem(tinfo->id, tinfo->id - 1, dm2dGetLine(fatias[prox], 1), tam_msg) != tam_msg) {
-                    fprintf(stderr, "\nErro ao enviar mensagem entre trabalhadoras.\n");
-                    exit(-1);
-                }
-                if(receberMensagem(tinfo->id - 1, tinfo->id, dm2dGetLine(fatias[prox], 0), tam_msg) != tam_msg) {
-                    fprintf(stderr, "\nErro ao receber mensagem entre trabalhadoras.\n");
-                    exit(-1);
-                }
-            }
-            if(tinfo->id < tinfo->trab) {
-                if(enviarMensagem(tinfo->id, tinfo->id + 1, dm2dGetLine(fatias[prox], tinfo->tam_fatia), tam_msg) != tam_msg) {
-                    fprintf(stderr, "\nErro ao enviar mensagem entre trabalhadoras.\n");
-                    exit(-1);
-                }
-                if(receberMensagem(tinfo->id + 1, tinfo->id, dm2dGetLine(fatias[prox], tinfo->tam_fatia + 1), tam_msg) != tam_msg) {
-                    fprintf(stderr, "\nErro ao receber mensagem entre trabalhadoras.\n");
-                    exit(-1);
-                }
-            }
-        }
-        else {
-            if(tinfo->id > 1) {
-                if(receberMensagem(tinfo->id - 1, tinfo->id, dm2dGetLine(fatias[prox], 0), tam_msg) != tam_msg) {
-                    fprintf(stderr, "\nErro ao receber mensagem entre trabalhadoras.\n");
-                    exit(-1);
-                }
-                if(enviarMensagem(tinfo->id, tinfo->id - 1, dm2dGetLine(fatias[prox], 1), tam_msg) != tam_msg) {
-                    fprintf(stderr, "\nErro ao enviar mensagem entre trabalhadoras.\n");
-                    exit(-1);
-                }
-            }
-            if(tinfo->id < tinfo->trab) {
-                if(receberMensagem(tinfo->id + 1, tinfo->id, dm2dGetLine(fatias[prox], tinfo->tam_fatia + 1), tam_msg) != tam_msg) {
-                    fprintf(stderr, "\nErro ao receber mensagem entre trabalhadoras.\n");
-                    exit(-1);
-                }
-                if(enviarMensagem(tinfo->id, tinfo->id + 1, dm2dGetLine(fatias[prox], tinfo->tam_fatia), tam_msg) != tam_msg) {
-                    fprintf(stderr, "\nErro ao enviar mensagem entre trabalhadoras.\n");
-                    exit(-1);
-                }
-            }
-        }
     }
-
-    /* Enviar Fatia Final à Tarefa Mestre */
-    for (i = 0; i < tinfo->tam_fatia; i++) {
-        res = enviarMensagem(tinfo->id, 0, dm2dGetLine(fatias[prox], i + 1), tam_msg);
-        if(res != tam_msg) {
-            fprintf(stderr, "\nErro ao enviar mensagem à tarefa mestre.\n");
-            exit(-1);
-        }
-    }
-
     /* Libertar Memoria Alocada */
     dm2dFree(fatias[0]);
     dm2dFree(fatias[1]);
@@ -184,12 +119,10 @@ int main (int argc, char** argv) {
     int trab;
     int csz;
     int tam_fatia;
-    int res, tam_msg;
-    int i, j;
-    DoubleMatrix2D  *matrix;
+    int res;
+    int i;
     thread_info *tinfo;
     pthread_t *trabalhadoras;
-
 
     if(argc != 9) {
         fprintf(stderr, "\nNúmero de Argumentos Inválido.\n");
@@ -222,12 +155,6 @@ int main (int argc, char** argv) {
     if (N % trab != 0) {
         fprintf(stderr, "\nErro: Argumento %s e %s invalidos\n"
                 "%s deve ser multiplo de %s.", "N", "trab", "N", "trab");
-        return -1;
-    }
-
-    /* Inicializar Biblioteca de Passagem de Mensagens */
-    if(inicializarMPlib(csz, trab + 1) != 0) {
-        fprintf(stderr, "\nErro ao inicializar MPlib\n");
         return -1;
     }
 
@@ -271,29 +198,6 @@ int main (int argc, char** argv) {
         }
     }
 
-    /* Enviar Fatias a cada Trabalhadora */
-    tam_msg = (N+2) * sizeof(double);
-    for (i = 0; i < trab; i++) {
-        for (j = 0; j < (tam_fatia + 2); j++) {
-            res = enviarMensagem(0, i+1, dm2dGetLine(matrix, i*tam_fatia + j), tam_msg);
-            if(res != tam_msg) {
-                fprintf(stderr, "\nErro ao enviar mensagem para trabalhadora.\n");
-                return -1;
-            }
-        }
-    }
-
-    /* Receber Fatias Finais de cada Trabalhadora e Guardar na Matriz */
-    for (i = 0; i < trab; i++) {
-        for (j = 0; j < tam_fatia; j++) {
-            res = receberMensagem(i+1, 0, dm2dGetLine(matrix, i*tam_fatia + j + 1), tam_msg);
-            if(res != tam_msg) {
-                fprintf(stderr, "\nErro ao receber mensagem de uma trabalhadora.\n");
-                return -1;
-            }
-        }
-    }
-
     /* Esperar que as Trabalhadoras Terminem */
     for (i = 0; i < trab; i++) {
         res = pthread_join(trabalhadoras[i], NULL);
@@ -311,7 +215,6 @@ int main (int argc, char** argv) {
     dm2dFree(matrix);
     free(tinfo);
     free(trabalhadoras);
-    libertarMPlib();
 
     return 0;
 }
