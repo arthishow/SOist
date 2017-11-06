@@ -12,7 +12,11 @@
 #include "matrix2d.h"
 #include "mplib3.h"
 
-DoubleMatrix2D* matrix, matrix_aux;
+DoubleMatrix2D *matrix, *matrix_aux;
+int counter = 0;
+pthread_mutex_t counterMutex;
+pthread_cond_t counterCond;
+
 
 /*--------------------------------------------------------------------
 | Type: thread_info
@@ -36,42 +40,47 @@ typedef struct {
 
 void *tarefa_trabalhadora(void* args) {
     thread_info *tinfo = (thread_info *) args;
-    DoubleMatrix2D *fatias[2];
-    int atual, prox;
-    int iter;
-    int i, j;
 
-    /* Criar Matrizes */
-    fatias[0] = dm2dNew(tinfo->tam_fatia+2,tinfo->N+2);
-    fatias[1] = dm2dNew(tinfo->tam_fatia+2,tinfo->N+2);
+    DoubleMatrix2D *m = matrix;
+    DoubleMatrix2D *m_aux = matrix_aux;
+    DoubleMatrix2D *m_tmp;
+    int N = tinfo->N;
+    int iter = tinfo->iter;
+    int ntrab = tinfo->trab;
+    int tam_fatia = tinfo->tam_fatia;
+    double value;
 
-    if (fatias[0] == NULL || fatias[1] == NULL) {
-        fprintf(stderr, "\nErro ao criar Matrix2d numa trabalhadora.\n");
-        exit(-1);
-    }
-
-    dm2dCopy(fatias[1], fatias[0]);
-
-    /* Ciclo Iterativo */
-    for (iter = 0; iter < tinfo->iter; iter++) {
-        atual = iter % 2;
-        prox = 1 - iter % 2;
-
-        /* Calcular Pontos Internos */
-        for (i = 0; i < tinfo->tam_fatia; i++) {
-            for (j = 0; j < tinfo->N; j++) {
-                double val = (dm2dGetEntry(fatias[atual], i, j+1) +
-                              dm2dGetEntry(fatias[atual], i+2, j+1) +
-                              dm2dGetEntry(fatias[atual], i+1, j) +
-                              dm2dGetEntry(fatias[atual], i+1, j+2))/4;
-                dm2dSetEntry(fatias[prox], i+1, j+1, val);
+    for(int k = 0; k < iter; k++) {
+        for (int i = 0; i < tam_fatia; i++) {
+            for (int j = 0; j < N; j++) {
+                value = ( dm2dGetEntry(m, i, j+1) + dm2dGetEntry(m, i+2, j+1) +
+                          dm2dGetEntry(m, i+1, j) + dm2dGetEntry(m, i+1, j+2) ) / 4.0;
+                dm2dSetEntry(m_aux, i+1, j+1, value);
             }
         }
-    }
-    /* Libertar Memoria Alocada */
-    dm2dFree(fatias[0]);
-    dm2dFree(fatias[1]);
 
+        pthread_mutex_lock(&counterMutex);
+        printf("thread %d, iter %d, counter %d, ntrab %d\n", tinfo->id, k, counter, ntrab);
+        counter++;
+        if(counter == ntrab) {
+            pthread_cond_broadcast(&counterCond);
+            dm2dPrint(m);
+        } else {
+            while(counter != ntrab) {
+                printf("thread %d waiting\n", tinfo->id);
+                if(pthread_cond_wait(&counterCond, &counterMutex) != 0) {
+                    fprintf(stderr, "\nErro ao esperar pela variável de condição\n");
+                    exit(1);
+                }
+            }
+        }
+        pthread_mutex_unlock(&counterMutex);
+
+        m_tmp = m;
+        m = m_aux;
+        m_aux = m_tmp;
+
+    }
     pthread_exit(NULL);
 }
 
@@ -107,6 +116,21 @@ double parse_double_or_exit(char const *str, char const *name) {
     return value;
 }
 
+static void freeGlobal() {
+    dm2dFree(matrix);
+    dm2dFree(matrix_aux);
+
+    if(pthread_mutex_destroy(&counterMutex) != 0) {
+        fprintf(stderr, "\nErro ao destruir mutex\n");
+        exit(1);
+    }
+
+    if(pthread_cond_destroy(&counterCond) != 0) {
+        fprintf(stderr, "\nErro ao destruir variável de condição\n");
+        exit(1);
+    }
+}
+
 /*--------------------------------------------------------------------
 | Function: main
 | Description: Entrada do programa
@@ -117,7 +141,7 @@ int main (int argc, char** argv) {
     double tEsq, tSup, tDir, tInf;
     int iter;
     int trab;
-    int csz;
+    double maxD;
     int tam_fatia;
     int res;
     int i;
@@ -126,7 +150,7 @@ int main (int argc, char** argv) {
 
     if(argc != 9) {
         fprintf(stderr, "\nNúmero de Argumentos Inválido.\n");
-        fprintf(stderr, "Utilização: heatSim_p1 N tEsq tSup tDir tInf iter trab csz\n\n");
+        fprintf(stderr, "Utilização: heatSim_p1 N tEsq tSup tDir tInf iter trab maxD\n\n");
         return -1;
     }
 
@@ -138,17 +162,17 @@ int main (int argc, char** argv) {
     tInf = parse_double_or_exit(argv[5], "tInf");
     iter = parse_integer_or_exit(argv[6], "iter");
     trab = parse_integer_or_exit(argv[7], "trab");
-    csz =  parse_integer_or_exit(argv[8], "csz");
+    maxD =  parse_double_or_exit(argv[8], "maxD");
 
     fprintf(stderr, "\nArgumentos:\n"
-            " N=%d tEsq=%.1f tSup=%.1f tDir=%.1f tInf=%.1f iter=%d trab=%d csz=%d",
-            N, tEsq, tSup, tDir, tInf, iter, trab, csz);
+            " N=%d tEsq=%.1f tSup=%.1f tDir=%.1f tInf=%.1f iter=%d trab=%d maxD=%f",
+            N, tEsq, tSup, tDir, tInf, iter, trab, maxD);
 
 
     /* Verificações de Input */
-    if(N < 1 || tEsq < 0 || tSup < 0 || tDir < 0 || tInf < 0 || iter < 1 || trab < 1 || csz < 0) {
+    if(N < 1 || tEsq < 0 || tSup < 0 || tDir < 0 || tInf < 0 || iter < 1 || trab < 1 || maxD < 0) {
         fprintf(stderr, "\nErro: Argumentos invalidos.\n"
-                " Lembrar que N >= 1, temperaturas >= 0, iter >= 1, trab >=1 e csz >= 0\n\n");
+                " Lembrar que N >= 1, temperaturas >= 0, iter >= 1, trab >=1 e maxD >= 0\n\n");
         return -1;
     }
 
@@ -163,10 +187,21 @@ int main (int argc, char** argv) {
 
     /* Criar Matriz Inicial */
     matrix = dm2dNew(N+2, N+2);
+    matrix_aux = dm2dNew(N+2, N+2);
 
-    if (matrix == NULL) {
+    if (matrix == NULL || matrix_aux == NULL) {
         fprintf(stderr, "\nErro ao criar Matrix2d.\n");
         return -1;
+    }
+
+    if(pthread_mutex_init(&counterMutex, NULL) != 0) {
+        fprintf(stderr, "\nErro ao inicializar mutex\n");
+        exit(1);
+    }
+
+    if(pthread_cond_init(&counterCond, NULL) != 0) {
+        fprintf(stderr, "\nErro ao inicializar variável de condição\n");
+        exit(1);
     }
 
     dm2dSetLineTo(matrix, 0, tSup);
@@ -180,6 +215,7 @@ int main (int argc, char** argv) {
 
     if (tinfo == NULL || trabalhadoras == NULL) {
         fprintf(stderr, "\nErro ao alocar memória para trabalhadoras.\n");
+        freeGlobal();
         return -1;
     }
 
@@ -194,6 +230,9 @@ int main (int argc, char** argv) {
 
         if(res != 0) {
             fprintf(stderr, "\nErro ao criar uma tarefa trabalhadora.\n");
+            freeGlobal();
+            free(tinfo);
+            free(trabalhadoras);
             return -1;
         }
     }
@@ -204,6 +243,9 @@ int main (int argc, char** argv) {
 
         if (res != 0) {
             fprintf(stderr, "\nErro ao esperar por uma tarefa trabalhadora.\n");
+            freeGlobal();
+            free(tinfo);
+            free(trabalhadoras);
             return -1;
         }
     }
@@ -212,7 +254,7 @@ int main (int argc, char** argv) {
     dm2dPrint(matrix);
 
     /* Libertar Memória */
-    dm2dFree(matrix);
+    freeGlobal();
     free(tinfo);
     free(trabalhadoras);
 
