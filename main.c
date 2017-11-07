@@ -16,6 +16,7 @@ DoubleMatrix2D *matrix, *matrix_aux;
 int counter = 0;
 pthread_mutex_t counterMutex;
 pthread_cond_t counterCond;
+int waitforthreads = 0;
 
 
 /*--------------------------------------------------------------------
@@ -51,6 +52,9 @@ void *tarefa_trabalhadora(void* args) {
     double value;
 
     for(int k = 0; k < iter; k++) {
+        
+        while(waitforthreads%ntrab!=0)
+
         for (int i = 0; i < tam_fatia; i++) {
             for (int j = 0; j < N; j++) {
                 value = ( dm2dGetEntry(m, i, j+1) + dm2dGetEntry(m, i+2, j+1) +
@@ -62,16 +66,19 @@ void *tarefa_trabalhadora(void* args) {
         pthread_mutex_lock(&counterMutex);
         printf("thread %d, iter %d, counter %d, ntrab %d\n", tinfo->id, k, counter, ntrab);
         counter++;
-        if(counter == ntrab) {
+        if(counter%ntrab==0) {
             pthread_cond_broadcast(&counterCond);
-            dm2dPrint(m);
-        } else {
-            while(counter != ntrab) {
+            waitforthreads++;
+        }
+        else {
+            while(counter%ntrab!=0) {
                 printf("thread %d waiting\n", tinfo->id);
                 if(pthread_cond_wait(&counterCond, &counterMutex) != 0) {
                     fprintf(stderr, "\nErro ao esperar pela variável de condição\n");
                     exit(1);
                 }
+                waitforthreads++;
+                /*printf("thread %d is free, counter %d\n", tinfo->id, counter);*/
             }
         }
         pthread_mutex_unlock(&counterMutex);
