@@ -6,17 +6,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-
-#include <time.h>
+#include <stdbool.h>
 
 #include "matrix2d.h"
-#include "mplib3.h"
 
 DoubleMatrix2D *matrix, *matrix_aux;
 int counter = 0;
+bool turnstile1 = false;
+bool turnstile2 = false;
 pthread_mutex_t counterMutex;
 pthread_cond_t counterCond;
-int waitforthreads = 0;
 
 
 /*--------------------------------------------------------------------
@@ -49,13 +48,13 @@ void *tarefa_trabalhadora(void* args) {
     int iter = tinfo->iter;
     int ntrab = tinfo->trab;
     int tam_fatia = tinfo->tam_fatia;
+    int id = tinfo->id;
     double value;
 
+    printf("tam_fatia %d", tam_fatia);
     for(int k = 0; k < iter; k++) {
-        
-        while(waitforthreads%ntrab!=0)
 
-        for (int i = 0; i < tam_fatia; i++) {
+        for (int i = (id-1)*tam_fatia; i < id*tam_fatia; i++) {
             for (int j = 0; j < N; j++) {
                 value = ( dm2dGetEntry(m, i, j+1) + dm2dGetEntry(m, i+2, j+1) +
                           dm2dGetEntry(m, i+1, j) + dm2dGetEntry(m, i+1, j+2) ) / 4.0;
@@ -63,29 +62,31 @@ void *tarefa_trabalhadora(void* args) {
             }
         }
 
+        m_tmp = m_aux;
+        m_aux = m;
+        m = m_tmp;
+
         pthread_mutex_lock(&counterMutex);
-        printf("thread %d, iter %d, counter %d, ntrab %d\n", tinfo->id, k, counter, ntrab);
         counter++;
-        if(counter%ntrab==0) {
+        if(counter == ntrab) {
+            turnstile2 = false;
+            turnstile1 = true;
             pthread_cond_broadcast(&counterCond);
-            waitforthreads++;
         }
         else {
-            while(counter%ntrab!=0) {
-                printf("thread %d waiting\n", tinfo->id);
-                if(pthread_cond_wait(&counterCond, &counterMutex) != 0) {
-                    fprintf(stderr, "\nErro ao esperar pela variável de condição\n");
-                    exit(1);
-                }
-                waitforthreads++;
-                /*printf("thread %d is free, counter %d\n", tinfo->id, counter);*/
-            }
+            while(!turnstile1) pthread_cond_wait(&counterCond, &counterMutex);
+        }
+
+        counter--;
+        if(counter == 0) {
+            turnstile1 = false;
+            turnstile2 = true;
+            pthread_cond_broadcast(&counterCond);
+        }
+        else {
+            while(!turnstile2) pthread_cond_wait(&counterCond, &counterMutex);
         }
         pthread_mutex_unlock(&counterMutex);
-
-        m_tmp = m;
-        m = m_aux;
-        m_aux = m_tmp;
 
     }
     pthread_exit(NULL);
@@ -216,6 +217,8 @@ int main (int argc, char** argv) {
     dm2dSetColumnTo(matrix, 0, tEsq);
     dm2dSetColumnTo(matrix, N+1, tDir);
 
+    dm2dCopy(matrix_aux, matrix);
+
     /* Reservar Memória para Trabalhadoras */
     tinfo = (thread_info *)malloc(trab * sizeof(thread_info));
     trabalhadoras = (pthread_t *)malloc(trab * sizeof(pthread_t));
@@ -258,7 +261,7 @@ int main (int argc, char** argv) {
     }
 
     /* Imprimir resultado */
-    dm2dPrint(matrix);
+    iter%2 == 0 ? dm2dPrint(matrix) : dm2dPrint(matrix_aux);
 
     /* Libertar Memória */
     freeGlobal();

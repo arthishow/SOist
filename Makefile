@@ -25,7 +25,7 @@ leQueue.o: leQueue.c leQueue.h
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 clean:
-	rm -f *.o *.orig heatSim1 heatSim2 heatSim3
+	rm -f *.o *.orig heatSim
 
 zip:
 	zip heatSim.zip main.c matrix2d.c matrix2d.h mplib3.c mplib3.h mp4lib.c mp4lib.h leQueue.c leQueue.h Makefile
