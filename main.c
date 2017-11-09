@@ -16,7 +16,9 @@ bool turnstile1 = false;
 bool turnstile2 = false;
 pthread_mutex_t counterMutex;
 pthread_cond_t counterCond;
-
+pthread_cond_t maxdCond;
+double threadsMaxD = 0;
+bool end = false;
 
 /*--------------------------------------------------------------------
 | Type: thread_info
@@ -29,6 +31,7 @@ typedef struct {
     int iter;
     int trab;
     int tam_fatia;
+    double maxD;
 } thread_info;
 
 
@@ -50,8 +53,8 @@ void *tarefa_trabalhadora(void* args) {
     int tam_fatia = tinfo->tam_fatia;
     int id = tinfo->id;
     double value;
+    double maxD = tinfo->maxD;
 
-    printf("tam_fatia %d", tam_fatia);
     for(int k = 0; k < iter; k++) {
 
         for (int i = (id-1)*tam_fatia; i < id*tam_fatia; i++) {
@@ -59,12 +62,20 @@ void *tarefa_trabalhadora(void* args) {
                 value = ( dm2dGetEntry(m, i, j+1) + dm2dGetEntry(m, i+2, j+1) +
                           dm2dGetEntry(m, i+1, j) + dm2dGetEntry(m, i+1, j+2) ) / 4.0;
                 dm2dSetEntry(m_aux, i+1, j+1, value);
+                
+                double dif = value - dm2dGetEntry(m, i+1, j+1);
+                
+                pthread_mutex_lock(&counterMutex);
+                if (dif > threadsMaxD) threadsMaxD=dif;
+                pthread_mutex_unlock(&counterMutex);
+
             }
         }
 
         m_tmp = m_aux;
         m_aux = m;
         m = m_tmp;
+
 
         pthread_mutex_lock(&counterMutex);
         counter++;
@@ -81,6 +92,10 @@ void *tarefa_trabalhadora(void* args) {
         if(counter == 0) {
             turnstile1 = false;
             turnstile2 = true;
+
+            threadsMaxD<maxD ? (end = true) : (threadsMaxD = 0);
+
+
             pthread_cond_broadcast(&counterCond);
         }
         else {
@@ -88,7 +103,10 @@ void *tarefa_trabalhadora(void* args) {
         }
         pthread_mutex_unlock(&counterMutex);
 
+        if(end) pthread_exit(NULL);
+
     }
+
     pthread_exit(NULL);
 }
 
@@ -236,6 +254,7 @@ int main (int argc, char** argv) {
         tinfo[i].iter = iter;
         tinfo[i].trab = trab;
         tinfo[i].tam_fatia = tam_fatia;
+        tinfo[i].maxD = maxD;
         res = pthread_create(&trabalhadoras[i], NULL, tarefa_trabalhadora, &tinfo[i]);
 
         if(res != 0) {
@@ -260,8 +279,7 @@ int main (int argc, char** argv) {
         }
     }
 
-    /* Imprimir resultado */
-    iter%2 == 0 ? dm2dPrint(matrix) : dm2dPrint(matrix_aux);
+    dm2dPrint(matrix);
 
     /* Libertar Memória */
     freeGlobal();
