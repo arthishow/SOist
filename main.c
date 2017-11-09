@@ -19,6 +19,7 @@ pthread_cond_t counterCond;
 pthread_cond_t maxdCond;
 double threadsMaxD = 0;
 bool end = false;
+int enditer;
 
 /*--------------------------------------------------------------------
 | Type: thread_info
@@ -55,7 +56,8 @@ void *tarefa_trabalhadora(void* args) {
     double value;
     double maxD = tinfo->maxD;
 
-    for(int k = 0; k < iter; k++) {
+    int k;
+    for(k = 0; k < iter; k++) {
 
         for (int i = (id-1)*tam_fatia; i < id*tam_fatia; i++) {
             for (int j = 0; j < N; j++) {
@@ -95,7 +97,6 @@ void *tarefa_trabalhadora(void* args) {
 
             threadsMaxD<maxD ? (end = true) : (threadsMaxD = 0);
 
-
             pthread_cond_broadcast(&counterCond);
         }
         else {
@@ -103,10 +104,14 @@ void *tarefa_trabalhadora(void* args) {
         }
         pthread_mutex_unlock(&counterMutex);
 
-        if(end) pthread_exit(NULL);
+        if(end) {
+            enditer=k; 
+            pthread_exit(NULL);
+        }
 
     }
 
+    enditer=k;
     pthread_exit(NULL);
 }
 
@@ -279,7 +284,7 @@ int main (int argc, char** argv) {
         }
     }
 
-    dm2dPrint(matrix);
+    (enditer)%2==0 ? dm2dPrint(matrix_aux) : dm2dPrint(matrix);
 
     /* Libertar Memória */
     freeGlobal();
