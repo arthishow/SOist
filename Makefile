@@ -31,4 +31,4 @@ zip:
 	zip heatSim.zip main.c matrix2d.c matrix2d.h mplib3.c mplib3.h mp4lib.c mp4lib.h leQueue.c leQueue.h Makefile
 
 run:
-	./heatSim 10 2.0 3.0 20.0 1.0 10 5 0
+	./heatSim 10 2.0 3.0 20.0 1.0 1000 5 0
