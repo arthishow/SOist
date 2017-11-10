@@ -60,28 +60,28 @@ void *tarefa_trabalhadora(void* args) {
 
     int i, j, k;
     for(k = 0; k < iter; k++) {
-		maxLocalD = 0;
+        maxLocalD = 0;
         for (i = (id-1)*tam_fatia; i < id*tam_fatia; i++) {
             for (j = 0; j < N; j++) {
                 value = ( dm2dGetEntry(m, i, j+1) + dm2dGetEntry(m, i+2, j+1) +
                           dm2dGetEntry(m, i+1, j) + dm2dGetEntry(m, i+1, j+2) ) / 4.0;
                 dm2dSetEntry(m_aux, i+1, j+1, value);
-                
-                dif = fabs(value - dm2dGetEntry(m, i+1, j+1));             
-                if (dif > maxLocalD){
-					maxLocalD = dif;
-				}
+
+                dif = fabs(value - dm2dGetEntry(m, i+1, j+1));
+                if (dif > maxLocalD) {
+                    maxLocalD = dif;
+                }
             }
         }
 
-		if(pthread_mutex_lock(&maxdMutex) != 0) {
+        if(pthread_mutex_lock(&maxdMutex) != 0) {
             fprintf(stderr, "\nErro ao bloquear mutex\n");
             exit(1);
         }
-		if(maxLocalD > threadsMaxD){
-			threadsMaxD = maxLocalD;
-		}
-		if (pthread_mutex_unlock(&maxdMutex) != 0) {
+        if(maxLocalD > threadsMaxD) {
+            threadsMaxD = maxLocalD;
+        }
+        if (pthread_mutex_unlock(&maxdMutex) != 0) {
             fprintf(stderr, "\nErro ao desbloquear mutex\n");
             exit(1);
         }
@@ -98,7 +98,7 @@ void *tarefa_trabalhadora(void* args) {
         if(counter == ntrab) {
             turnstile2 = false;
             turnstile1 = true;
-            
+
             if (pthread_cond_broadcast(&counterCond) != 0) {
                 fprintf(stderr, "\nErro ao desbloquear variável de condição\n");
                 exit(1);
@@ -111,19 +111,19 @@ void *tarefa_trabalhadora(void* args) {
                     exit(1);
                 }
             }
-
         }
         counter--;
-        if(threadsMaxD < maxD && threadsMaxD != 0){
-			end = true;
-		}else{
-			threadsMaxD = 0;
-		}
-        
+        if(threadsMaxD < maxD && threadsMaxD != 0) {
+            end = true;
+            endIter = k;
+        } else {
+            threadsMaxD = 0;
+        }
+
         if(counter == 0) {
             turnstile1 = false;
             turnstile2 = true;
-            
+
             if (pthread_cond_broadcast(&counterCond) != 0) {
                 fprintf(stderr, "\nErro ao desbloquear variável de condição\n");
                 exit(1);
@@ -144,7 +144,6 @@ void *tarefa_trabalhadora(void* args) {
         }
 
         if(end) {
-            endIter = k; 
             pthread_exit(NULL);
         }
     }
@@ -193,7 +192,7 @@ static void freeGlobal() {
         fprintf(stderr, "\nErro ao destruir mutex\n");
         exit(1);
     }
-    
+
     if(pthread_mutex_destroy(&maxdMutex) != 0) {
         fprintf(stderr, "\nErro ao destruir mutex\n");
         exit(1);
@@ -272,7 +271,7 @@ int main (int argc, char** argv) {
         fprintf(stderr, "\nErro ao inicializar mutex\n");
         exit(1);
     }
-    
+
     if(pthread_mutex_init(&maxdMutex, NULL) != 0) {
         fprintf(stderr, "\nErro ao inicializar mutex\n");
         exit(1);
