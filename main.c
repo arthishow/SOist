@@ -74,25 +74,44 @@ void *tarefa_trabalhadora(void* args) {
             }
         }
 
-		pthread_mutex_lock(&maxdMutex);
+		if(pthread_mutex_lock(&maxdMutex) != 0) {
+            fprintf(stderr, "\nErro ao bloquear mutex\n");
+            exit(1);
+        }
 		if(maxLocalD > threadsMaxD){
 			threadsMaxD = maxLocalD;
 		}
-		pthread_mutex_unlock(&maxdMutex);
+		if (pthread_mutex_unlock(&maxdMutex) != 0) {
+            fprintf(stderr, "\nErro ao desbloquear mutex\n");
+            exit(1);
+        }
 
         m_tmp = m_aux;
         m_aux = m;
         m = m_tmp;
 
-        pthread_mutex_lock(&counterMutex);
+        if(pthread_mutex_lock(&counterMutex) != 0) {
+            fprintf(stderr, "\nErro ao bloquear mutex\n");
+            exit(1);
+        }
         counter++;
         if(counter == ntrab) {
             turnstile2 = false;
             turnstile1 = true;
-            pthread_cond_broadcast(&counterCond);
+            
+            if (pthread_cond_broadcast(&counterCond) != 0) {
+                fprintf(stderr, "\nErro ao desbloquear variável de condição\n");
+                exit(1);
+            }
         }
         else {
-            while(!turnstile1) pthread_cond_wait(&counterCond, &counterMutex);
+            while(!turnstile1) {
+                if(pthread_cond_wait(&counterCond, &counterMutex) != 0) {
+                    fprintf(stderr, "\nErro ao esperar pela variável de condição\n");
+                    exit(1);
+                }
+            }
+
         }
         counter--;
         if(threadsMaxD < maxD && threadsMaxD != 0){
@@ -104,12 +123,25 @@ void *tarefa_trabalhadora(void* args) {
         if(counter == 0) {
             turnstile1 = false;
             turnstile2 = true;
-            pthread_cond_broadcast(&counterCond);
+            
+            if (pthread_cond_broadcast(&counterCond) != 0) {
+                fprintf(stderr, "\nErro ao desbloquear variável de condição\n");
+                exit(1);
+            }
+
         }
         else {
-            while(!turnstile2) pthread_cond_wait(&counterCond, &counterMutex);
+            while(!turnstile2) {
+                if(pthread_cond_wait(&counterCond, &counterMutex) != 0) {
+                    fprintf(stderr, "\nErro ao esperar pela variável de condição\n");
+                    exit(1);
+                }
+            }
         }
-        pthread_mutex_unlock(&counterMutex);
+        if (pthread_mutex_unlock(&counterMutex) != 0) {
+            fprintf(stderr, "\nErro ao desbloquear mutex\n");
+            exit(1);
+        }
 
         if(end) {
             endIter = k; 
@@ -300,7 +332,6 @@ int main (int argc, char** argv) {
         }
     }
 
-	printf("endIter %d\n", endIter);
     endIter%2 == 0 ? dm2dPrint(matrix_aux) : dm2dPrint(matrix);
 
     /* Libertar Memória */
