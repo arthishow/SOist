@@ -148,7 +148,7 @@ void *tarefa_trabalhadora(void* args) {
         }
     }
 
-    endIter = k+1;
+    endIter = k-1;
     pthread_exit(NULL);
 }
 
