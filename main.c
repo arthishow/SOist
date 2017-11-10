@@ -149,7 +149,7 @@ void *tarefa_trabalhadora(void* args) {
         }
     }
 
-    endIter = k;
+    endIter = k+1;
     pthread_exit(NULL);
 }
 
@@ -332,7 +332,7 @@ int main (int argc, char** argv) {
         }
     }
 
-    endIter%2 == 0 ? dm2dPrint(matrix_aux) : dm2dPrint(matrix);
+    (endIter)%2 == 0 ? dm2dPrint(matrix_aux) : dm2dPrint(matrix);
 
     /* Libertar Memória */
     freeGlobal();
