@@ -1,34 +1,32 @@
-# Makefile
+# Makefile, versao 3
 # Sistemas Operativos, DEI/IST/ULisboa 2017-18
 
-CFLAGS += -g -Wall -pedantic
-CC = gcc
+CC       = gcc
+CFLAGS   = -g -std=gnu99 -Wall -pedantic -pthread
+
+.PHONY: all clean zip
 
 all: heatSim
 
-heatSim: main.o matrix2d.o leQueue.o
-	$(CC) -o $@ $^ $(CFLAGS) -lpthread
+heatSim: main.o matrix2d.o util.o
+	$(CC) $(CFLAGS) -o $@ $+
 
-main.o: main.c matrix2d.h mplib3.h
-	$(CC) -o $@ -c $< $(CFLAGS)
+main.o: main.c matrix2d.h util.h
+	$(CC) $(CFLAGS) -o $@ -c $<
 
 matrix2d.o: matrix2d.c matrix2d.h
-	$(CC) -o $@ -c $< $(CFLAGS)
+	$(CC) $(CFLAGS) -o $@ -c $<
 
-mplib3.o: mplib3.c mplib3.h
-	$(CC) -o $@ -c $< $(CFLAGS)
-	
-mplib4.o: mplib4.c mplib4.h
-	$(CC) -o $@ -c $< $(CFLAGS)
-
-leQueue.o: leQueue.c leQueue.h
-	$(CC) -o $@ -c $< $(CFLAGS)
+util.o: util.c
+	$(CC) $(CFLAGS) -o $@ -c $<
 
 clean:
-	rm -f *.o *.orig heatSim
+	rm -f *.o heatSim
 
-zip:
-	zip heatSim.zip main.c matrix2d.c matrix2d.h mplib3.c mplib3.h mp4lib.c mp4lib.h leQueue.c leQueue.h Makefile
+zip: heatSim.zip
+
+heatSim.zip: Makefile p3_main.c matrix2d.h util.h matrix2d.c matrix2d.h util.c
+	zip $@ $+
 
 run:
-	./heatSim 10 2.0 3.0 20.0 1.0 1000 5 0
+	./heatSim 10 10 10 0 0 100000 5 0
