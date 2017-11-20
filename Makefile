@@ -6,7 +6,7 @@ CC = gcc
 
 all: heatSim
 
-heatSim: main.o matrix2d.o leQueue.o mplib4.o
+heatSim: main.o matrix2d.o leQueue.o
 	$(CC) -o $@ $^ $(CFLAGS) -lpthread
 
 main.o: main.c matrix2d.h mplib3.h
@@ -31,4 +31,4 @@ zip:
 	zip heatSim.zip main.c matrix2d.c matrix2d.h mplib3.c mplib3.h mp4lib.c mp4lib.h leQueue.c leQueue.h Makefile
 
 run:
-	./heatSim 5 10 10 0 0 1 5 0
+	./heatSim 10 2.0 3.0 20.0 1.0 1000 5 0
