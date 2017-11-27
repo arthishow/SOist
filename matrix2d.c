@@ -138,3 +138,18 @@ DoubleMatrix2D *readMatrix2dFromFile(FILE *f, int l, int c) {
 
   return m;
 }
+
+/*--------------------------------------------------------------------
+| Function: dm2dPrintToFile
+---------------------------------------------------------------------*/
+
+void dm2dPrintToFile (FILE *f, DoubleMatrix2D *matrix) {
+  int i, j;
+
+  fprintf (f, "\n");
+  for (i=0; i<matrix->n_l; i++) {
+    for (j=0; j<matrix->n_c; j++)
+      fprintf(f, " %8.4f", dm2dGetEntry(matrix, i, j));
+    fprintf (f, "\n");
+  }
+}

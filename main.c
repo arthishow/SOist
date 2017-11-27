@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <math.h>
+#include <unistd.h>
 
 #include "matrix2d.h"
 #include "util.h"
@@ -37,6 +38,7 @@ typedef struct {
   int             iteracoes_concluidas;
   pthread_mutex_t mutex;
   pthread_cond_t  wait[2];
+  int periodoS;
 } DualBarrierWithMax;
 
 /*--------------------------------------------------------------------
@@ -46,13 +48,14 @@ typedef struct {
 DoubleMatrix2D     *matrix_copies[2];
 DualBarrierWithMax *dual_barrier;
 double              maxD;
+FILE *fp;
 
 /*--------------------------------------------------------------------
 | Function: dualBarrierInit
 | Description: Inicializa uma barreira dupla
 ---------------------------------------------------------------------*/
 
-DualBarrierWithMax *dualBarrierInit(int ntasks) {
+DualBarrierWithMax *dualBarrierInit(int ntasks, int periodoS) {
   DualBarrierWithMax *b;
   b = (DualBarrierWithMax*) malloc (sizeof(DualBarrierWithMax));
   if (b == NULL) return NULL;
@@ -63,6 +66,7 @@ DualBarrierWithMax *dualBarrierInit(int ntasks) {
   b->maxdelta[0] = 0;
   b->maxdelta[1] = 0;
   b->iteracoes_concluidas = 0;
+  b->periodoS=periodoS;
 
   if (pthread_mutex_init(&(b->mutex), NULL) != 0) {
     fprintf(stderr, "\nErro a inicializar mutex\n");
@@ -127,6 +131,14 @@ double dualBarrierWait (DualBarrierWithMax* b, int current, double localmax) {
     b->iteracoes_concluidas++;
     b->pending[next]  = b->total_nodes;
     b->maxdelta[next] = 0;
+    if(b->iteracoes_concluidas%b->periodoS==0 && b->periodoS!=0) {
+      int pid = fork();
+      if(pid==0) {
+        dm2dPrintToFile(fp, matrix_copies[1-b->iteracoes_concluidas%2]);
+        exit(1);
+      }
+    }
+
     if (pthread_cond_broadcast(&(b->wait[current])) != 0) {
       fprintf(stderr, "\nErro a assinalar todos em variável de condição\n");
       exit(1);
@@ -184,6 +196,7 @@ void *tarefa_trabalhadora(void *args) {
     }
     // barreira de sincronizacao; calcular delta global
     global_delta = dualBarrierWait(dual_barrier, atual, max_delta);
+
   } while (++iter < tinfo->iter && global_delta >= tinfo->maxD);
 
   return 0;
@@ -200,9 +213,11 @@ int main (int argc, char** argv) {
   int iter, trab;
   int tam_fatia;
   int res;
+  char *fichS;
+  int periodoS;
 
-  if (argc != 9) {
-    fprintf(stderr, "Utilizacao: ./heatSim N tEsq tSup tDir tInf iter trab maxD\n\n");
+  if (argc != 11) {
+    fprintf(stderr, "Utilizacao: ./heatSim N tEsq tSup tDir tInf iter trab maxD fichS periodoS\n\n");
     die("Numero de argumentos invalido");
   }
 
@@ -215,6 +230,9 @@ int main (int argc, char** argv) {
   iter = parse_integer_or_exit(argv[6], "iter", 1);
   trab = parse_integer_or_exit(argv[7], "trab", 1);
   maxD = parse_double_or_exit (argv[8], "maxD", 0);
+  fichS = argv[9];
+  periodoS = parse_integer_or_exit(argv[10], "periodoS", 0);
+
 
   //fprintf(stderr, "\nArgumentos:\n"
   // " N=d tEsq=%.1f tSup=%.1f tDir=%.1f tInf=%.1f iter=%d trab=%d csz=%d",
@@ -227,7 +245,7 @@ int main (int argc, char** argv) {
   }
 
   // Inicializar Barreira
-  dual_barrier = dualBarrierInit(trab);
+  dual_barrier = dualBarrierInit(trab, periodoS);
   if (dual_barrier == NULL)
     die("Nao foi possivel inicializar barreira");
 
@@ -241,10 +259,17 @@ int main (int argc, char** argv) {
     die("Erro ao criar matrizes");
   }
 
-  dm2dSetLineTo (matrix_copies[0], 0, tSup);
-  dm2dSetLineTo (matrix_copies[0], N+1, tInf);
-  dm2dSetColumnTo (matrix_copies[0], 0, tEsq);
-  dm2dSetColumnTo (matrix_copies[0], N+1, tDir);
+  fp = fopen(fichS, "r+");
+  if(fp==NULL) {
+    dm2dSetLineTo (matrix_copies[0], 0, tSup);
+    dm2dSetLineTo (matrix_copies[0], N+1, tInf);
+    dm2dSetColumnTo (matrix_copies[0], 0, tEsq);
+    dm2dSetColumnTo (matrix_copies[0], N+1, tDir);
+  }
+  else {
+    matrix_copies[0]=readMatrix2dFromFile(fp, N+2, N+2);
+  }
+
   dm2dCopy (matrix_copies[1],matrix_copies[0]);
 
   // Reservar memoria para trabalhadoras
@@ -276,7 +301,13 @@ int main (int argc, char** argv) {
       die("Erro ao esperar por uma tarefa trabalhadora");
   }
 
+  fclose(fp);
+
   dm2dPrint (matrix_copies[dual_barrier->iteracoes_concluidas%2]);
+
+  unlink(fichS);
+
+
 
   // Libertar memoria
   dm2dFree(matrix_copies[0]);

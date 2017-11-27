@@ -29,4 +29,4 @@ heatSim.zip: Makefile p3_main.c matrix2d.h util.h matrix2d.c matrix2d.h util.c
 	zip $@ $+
 
 run:
-	./heatSim 10 10 10 0 0 100000 5 0
+	./heatSim 10 10 10 0 0 100000 5 0 teste.txt 100 
