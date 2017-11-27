@@ -9,6 +9,8 @@
 #include <math.h>
 #include <unistd.h>
 
+#include <sys/wait.h>
+
 #include "matrix2d.h"
 #include "util.h"
 
@@ -39,6 +41,7 @@ typedef struct {
   pthread_mutex_t mutex;
   pthread_cond_t  wait[2];
   int periodoS;
+  char *fichS;
 } DualBarrierWithMax;
 
 /*--------------------------------------------------------------------
@@ -48,14 +51,13 @@ typedef struct {
 DoubleMatrix2D     *matrix_copies[2];
 DualBarrierWithMax *dual_barrier;
 double              maxD;
-FILE *fp;
 
 /*--------------------------------------------------------------------
 | Function: dualBarrierInit
 | Description: Inicializa uma barreira dupla
 ---------------------------------------------------------------------*/
 
-DualBarrierWithMax *dualBarrierInit(int ntasks, int periodoS) {
+DualBarrierWithMax *dualBarrierInit(int ntasks, int periodoS, char *fichS) {
   DualBarrierWithMax *b;
   b = (DualBarrierWithMax*) malloc (sizeof(DualBarrierWithMax));
   if (b == NULL) return NULL;
@@ -67,6 +69,7 @@ DualBarrierWithMax *dualBarrierInit(int ntasks, int periodoS) {
   b->maxdelta[1] = 0;
   b->iteracoes_concluidas = 0;
   b->periodoS=periodoS;
+  b->fichS=fichS;
 
   if (pthread_mutex_init(&(b->mutex), NULL) != 0) {
     fprintf(stderr, "\nErro a inicializar mutex\n");
@@ -132,9 +135,14 @@ double dualBarrierWait (DualBarrierWithMax* b, int current, double localmax) {
     b->pending[next]  = b->total_nodes;
     b->maxdelta[next] = 0;
     if(b->iteracoes_concluidas%b->periodoS==0 && b->periodoS!=0) {
+      wait(NULL);
       int pid = fork();
       if(pid==0) {
+        FILE *fp;
+        fp = fopen(b->fichS, "w");
         dm2dPrintToFile(fp, matrix_copies[1-b->iteracoes_concluidas%2]);
+        fclose(fp);
+        
         exit(1);
       }
     }
@@ -245,7 +253,7 @@ int main (int argc, char** argv) {
   }
 
   // Inicializar Barreira
-  dual_barrier = dualBarrierInit(trab, periodoS);
+  dual_barrier = dualBarrierInit(trab, periodoS, fichS);
   if (dual_barrier == NULL)
     die("Nao foi possivel inicializar barreira");
 
@@ -259,7 +267,8 @@ int main (int argc, char** argv) {
     die("Erro ao criar matrizes");
   }
 
-  fp = fopen(fichS, "r+");
+  FILE *fp;
+  fp = fopen(fichS, "r");
   if(fp==NULL) {
     dm2dSetLineTo (matrix_copies[0], 0, tSup);
     dm2dSetLineTo (matrix_copies[0], N+1, tInf);
@@ -301,11 +310,10 @@ int main (int argc, char** argv) {
       die("Erro ao esperar por uma tarefa trabalhadora");
   }
 
-  fclose(fp);
 
   dm2dPrint (matrix_copies[dual_barrier->iteracoes_concluidas%2]);
 
-  unlink(fichS);
+  //unlink(fichS);
 
 
 
