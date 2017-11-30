@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <math.h>
 #include <unistd.h>
+#include <string.h>
 
 #include <sys/wait.h>
 
@@ -134,16 +135,31 @@ double dualBarrierWait (DualBarrierWithMax* b, int current, double localmax) {
     b->iteracoes_concluidas++;
     b->pending[next]  = b->total_nodes;
     b->maxdelta[next] = 0;
+
+
     if(b->iteracoes_concluidas%b->periodoS==0 && b->periodoS!=0) {
-      wait(NULL);
-      int pid = fork();
-      if(pid==0) {
-        FILE *fp;
-        fp = fopen(b->fichS, "w");
-        dm2dPrintToFile(fp, matrix_copies[1-b->iteracoes_concluidas%2]);
-        fclose(fp);
+
+      if(waitpid(-1, NULL, WNOHANG)) {
+
+        pid_t pid = fork();
         
-        exit(1);
+
+        if(pid==0) {
+          FILE *fp;
+          printf("%d\n", getpid());
+          
+          char fichS_aux[strlen(b->fichS)];
+          strcpy(fichS_aux, b->fichS);
+          strcat(fichS_aux, "~");
+          
+          fp = fopen(fichS_aux, "w");
+          dm2dPrintToFile(fp, matrix_copies[1-b->iteracoes_concluidas%2]);
+          fclose(fp);
+
+          rename(fichS_aux, b->fichS);       
+          
+          exit(0);
+        }
       }
     }
 
@@ -274,10 +290,14 @@ int main (int argc, char** argv) {
     dm2dSetLineTo (matrix_copies[0], N+1, tInf);
     dm2dSetColumnTo (matrix_copies[0], 0, tEsq);
     dm2dSetColumnTo (matrix_copies[0], N+1, tDir);
-  }
+}
+
   else {
     matrix_copies[0]=readMatrix2dFromFile(fp, N+2, N+2);
+    fclose(fp);
   }
+
+  
 
   dm2dCopy (matrix_copies[1],matrix_copies[0]);
 
@@ -313,7 +333,8 @@ int main (int argc, char** argv) {
 
   dm2dPrint (matrix_copies[dual_barrier->iteracoes_concluidas%2]);
 
-  //unlink(fichS);
+  wait(NULL);
+  unlink(fichS);
 
 
 
