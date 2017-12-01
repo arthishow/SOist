@@ -9,6 +9,7 @@
 #include <math.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 
 #include <sys/wait.h>
 
@@ -52,6 +53,7 @@ typedef struct {
 DoubleMatrix2D     *matrix_copies[2];
 DualBarrierWithMax *dual_barrier;
 double              maxD;
+int 				save=0;
 
 /*--------------------------------------------------------------------
 | Function: dualBarrierInit
@@ -137,7 +139,7 @@ double dualBarrierWait (DualBarrierWithMax* b, int current, double localmax) {
     b->maxdelta[next] = 0;
 
 
-    if(b->iteracoes_concluidas%b->periodoS==0 && b->periodoS!=0) {
+    if(save) {
 
       if(waitpid(-1, NULL, WNOHANG)) {
 
@@ -156,9 +158,13 @@ double dualBarrierWait (DualBarrierWithMax* b, int current, double localmax) {
           dm2dPrintToFile(fp, matrix_copies[1-b->iteracoes_concluidas%2]);
           fclose(fp);
 
-          rename(fichS_aux, b->fichS);       
+          rename(fichS_aux, b->fichS);  
           
           exit(0);
+        }
+        else {
+        	alarm(b->periodoS);
+        	save=0;
         }
       }
     }
@@ -227,6 +233,24 @@ void *tarefa_trabalhadora(void *args) {
 }
 
 /*--------------------------------------------------------------------
+| Function: handler
+---------------------------------------------------------------------*/
+
+void handler(int signal_num) {
+
+	switch(signal_num) {
+		case SIGALRM:
+			save=1;
+			break;
+
+		// case SIGINT:
+
+		default:
+			return;
+	}
+}
+
+/*--------------------------------------------------------------------
 | Function: main
 | Description: Entrada do programa
 ---------------------------------------------------------------------*/
@@ -258,10 +282,6 @@ int main (int argc, char** argv) {
   periodoS = parse_integer_or_exit(argv[10], "periodoS", 0);
 
 
-  //fprintf(stderr, "\nArgumentos:\n"
-  // " N=d tEsq=%.1f tSup=%.1f tDir=%.1f tInf=%.1f iter=%d trab=%d csz=%d",
-  // N, tEsq, tSup, tDir, tInf, iter, trab, csz);
-
   if (N % trab != 0) {
     fprintf(stderr, "\nErro: Argumento %s e %s invalidos.\n"
                     "%s deve ser multiplo de %s.", "N", "trab", "N", "trab");
@@ -283,6 +303,8 @@ int main (int argc, char** argv) {
     die("Erro ao criar matrizes");
   }
 
+  
+  // Abrir ficheiro associado - importar matrix
   FILE *fp;
   fp = fopen(fichS, "r");
   if(fp==NULL) {
@@ -297,8 +319,6 @@ int main (int argc, char** argv) {
     fclose(fp);
   }
 
-  
-
   dm2dCopy (matrix_copies[1],matrix_copies[0]);
 
   // Reservar memoria para trabalhadoras
@@ -308,6 +328,22 @@ int main (int argc, char** argv) {
   if (tinfo == NULL || trabalhadoras == NULL) {
     die("Erro ao alocar memoria para trabalhadoras");
   }
+
+  
+  // Tratar signals
+  struct sigaction sa;
+  
+  sa.sa_handler = handler;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = SA_RESTART;
+
+  if(sigaction(SIGALRM, &sa, NULL)==-1) {
+  	perror("Erro ao tratar signal SIGALRM");
+  }
+  
+
+  alarm(periodoS);
+
 
   // Criar trabalhadoras
   for (int i=0; i < trab; i++) {
@@ -333,6 +369,7 @@ int main (int argc, char** argv) {
 
   dm2dPrint (matrix_copies[dual_barrier->iteracoes_concluidas%2]);
 
+  // Apaga o ficheiro de salvaguarda
   wait(NULL);
   unlink(fichS);
 
