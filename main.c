@@ -54,6 +54,7 @@ DoubleMatrix2D     *matrix_copies[2];
 DualBarrierWithMax *dual_barrier;
 double              maxD;
 int 				save=0;
+int 				terminate=0;
 
 /*--------------------------------------------------------------------
 | Function: dualBarrierInit
@@ -148,7 +149,6 @@ double dualBarrierWait (DualBarrierWithMax* b, int current, double localmax) {
 
         if(pid==0) {
           FILE *fp;
-          printf("%d\n", getpid());
           
           char fichS_aux[strlen(b->fichS)];
           strcpy(fichS_aux, b->fichS);
@@ -158,11 +158,15 @@ double dualBarrierWait (DualBarrierWithMax* b, int current, double localmax) {
           dm2dPrintToFile(fp, matrix_copies[1-b->iteracoes_concluidas%2]);
           fclose(fp);
 
-          rename(fichS_aux, b->fichS);  
+          rename(fichS_aux, b->fichS);
           
           exit(0);
         }
         else {
+        	if(terminate) {
+        		wait(NULL);
+        		exit(0);
+        	}
         	alarm(b->periodoS);
         	save=0;
         }
@@ -205,6 +209,7 @@ void *tarefa_trabalhadora(void *args) {
   int iter = 0;
 
   do {
+  	
     int atual = iter % 2;
     int prox = 1 - iter % 2;
     double max_delta = 0;
@@ -243,7 +248,10 @@ void handler(int signal_num) {
 			save=1;
 			break;
 
-		// case SIGINT:
+		case SIGINT:
+			save=1;
+			terminate=1;
+			break;
 
 		default:
 			return;
@@ -339,6 +347,10 @@ int main (int argc, char** argv) {
 
   if(sigaction(SIGALRM, &sa, NULL)==-1) {
   	perror("Erro ao tratar signal SIGALRM");
+  }
+
+  if(sigaction(SIGINT, &sa, NULL)==-1) {
+  	perror("Erro ao tratar signal SIGINT");
   }
   
 
